@@ -5,12 +5,14 @@
 
 #include <stdbool.h>
 
-
+#if 0
 void puts(const char *a){ UNUSED(a); }
 void puth(unsigned int i){ UNUSED(i); }
 void puth2(unsigned int i){ UNUSED(i); }
+#endif
 
 // ********************* Includes *********************
+#include <stddef.h>
 #include "libc.h"
 #include "critical.h"
 #include "faults.h"
@@ -18,10 +20,14 @@ void puth2(unsigned int i){ UNUSED(i); }
 #include "interrupts.h"
 #include "clock.h"
 #include "llgpio.h"
+#include "uart.h"
 
-#define LED_BLUE  5
-#define LED_GREEN 6
-#define LED_RED   7
+
+
+#define LED_GPIO  GPIOA
+#define LED_BLUE  1
+#define LED_GREEN 2
+#define LED_RED   3
 
 #define LED_ON    0
 #define LED_OFF   1
@@ -30,10 +36,20 @@ void puth2(unsigned int i){ UNUSED(i); }
 
 int led_value = 0;
 
+void led_set(int led, int value);
+
+void debug_ring_callback(uart_ring *ring) {
+      char rcv;
+      while (getc(ring, &rcv) != 0) {
+              (void)putc(ring, rcv);
+      }
+      
+}
+
 void TIM3_IRQ_Handler(void) {
 
    // blink the LED
-   set_gpio_output(GPIOA,LED_RED, led_value);
+   led_set(LED_RED, led_value);
    led_value = !led_value;
    TIM3->SR = 0;
           
@@ -47,44 +63,74 @@ void timer_init(TIM_TypeDef *TIM, int psc) {
 }
 
 
+void led_set(int led, int value)
+{
+    switch (led) {
+    case LED_BLUE:
+            set_gpio_mode(LED_GPIO, 5, !value);
+            break;
+    case LED_GREEN:
+            set_gpio_mode(LED_GPIO, 6, !value);
+            break;
+    case LED_RED:
+            set_gpio_mode(LED_GPIO, 7, !value);
+            break;
+    default:
+            break;
+                       
+    }
+}
 
-int main(void) {
-
-  // Init interrupt table
-  //init_interrupts(true);
-  REGISTER_INTERRUPT(TIM3_IRQn, TIM3_IRQ_Handler, 1000U, FAULT_INTERRUPT_RATE_TIM3);
-
-  disable_interrupts();
-  clock_init();
-
+void led_init(void)
+{
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIOCEN;
   RCC->AHB1ENR |= RCC_AHB1ENR_GPIODEN;
 
-  //register_set_bits(&(RCC->APB1ENR), RCC_APB1ENR_TIM6EN); 
+  set_gpio_mode(GPIOA, 5, MODE_OUTPUT);
+  set_gpio_mode(GPIOA, 6, MODE_OUTPUT);
+  set_gpio_mode(GPIOA, 7, MODE_OUTPUT);
+
+  led_set(LED_BLUE,  LED_OFF);
+  led_set(LED_GREEN, LED_OFF);
+  led_set(LED_RED,   LED_OFF);
+  
+}
+
+void timer3_init(void)
+{
   register_set_bits(&(RCC->APB1ENR), RCC_APB1ENR_TIM3EN); 
-
-  set_gpio_mode(GPIOA, LED_BLUE,    MODE_OUTPUT);
-  set_gpio_mode(GPIOA, LED_GREEN,  MODE_OUTPUT);
-  set_gpio_mode(GPIOA, LED_RED,     MODE_OUTPUT);
-
-  set_gpio_output(GPIOA, LED_BLUE,  LED_OFF);
-  set_gpio_output(GPIOA, LED_GREEN, LED_OFF);
-  set_gpio_output(GPIOA, LED_RED,   LED_OFF);
-
   timer_init(TIM3, 15);
   NVIC_EnableIRQ(TIM3_IRQn);
+}
 
+int main(void) {
+
+  int counter;
+
+  // Init interrupt table
+  init_interrupts(true);
+  REGISTER_INTERRUPT(TIM3_IRQn, TIM3_IRQ_Handler, 1000U, FAULT_INTERRUPT_RATE_TIM3);
+
+  disable_interrupts();
+  clock_init();
+  led_init();
+  //timer3_init();
+  RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
+  set_gpio_alternate(GPIOD, 5, GPIO_AF7_USART2);
+  set_gpio_alternate(GPIOD, 6, GPIO_AF7_USART2);
+  uart_init(&uart_ring_debug, 115200);
   enable_interrupts();
 
+  counter = 0;
   for(;;){
-
-      set_gpio_output(GPIOA, LED_GREEN, LED_OFF);
+      led_set(LED_GREEN, LED_OFF);
       delay(LED_DELAY);
-      set_gpio_output(GPIOA, LED_GREEN, LED_ON);
+      led_set(LED_GREEN, LED_ON);
       delay(LED_DELAY);
-
+      puts("counter:"); puth(counter); puts("\n");
+      counter++;
   }
 
   return 0;
