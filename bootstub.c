@@ -32,7 +32,7 @@ void puth2(unsigned int i){ UNUSED(i); }
 #define LED_ON    0
 #define LED_OFF   1
 
-#define LED_DELAY 500000
+#define LED_DELAY 5000000
 
 int led_value = 0;
 
@@ -40,9 +40,12 @@ void led_set(int led, int value);
 
 void debug_ring_callback(uart_ring *ring) {
       char rcv;
+      static int led_val = 0;
       while (getc(ring, &rcv) != 0) {
               (void)putc(ring, rcv);
       }
+      led_set(LED_BLUE, led_val);
+      led_val = !led_val;
       
 }
 
@@ -108,6 +111,7 @@ void timer3_init(void)
 int main(void) {
 
   int counter;
+  volatile unsigned int id = DBGMCU->IDCODE;
 
   // Init interrupt table
   init_interrupts(true);
@@ -116,12 +120,17 @@ int main(void) {
   disable_interrupts();
   clock_init();
   led_init();
-  //timer3_init();
+  timer3_init();
+
+  // USART2 
   RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
   set_gpio_alternate(GPIOD, 5, GPIO_AF7_USART2);
   set_gpio_alternate(GPIOD, 6, GPIO_AF7_USART2);
   uart_init(&uart_ring_debug, 115200);
+
   enable_interrupts();
+
+  puts("MCU_ID:"); puth(id); puts("\n");
 
   counter = 0;
   for(;;){

@@ -8,3 +8,6 @@
 ## Sofware
 - build: scons
 - flash: DFU
+
+## Info
+MCU_ID:100764137 (STM32F407)
