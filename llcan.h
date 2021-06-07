@@ -116,12 +116,6 @@ bool llcan_init(CAN_TypeDef *CAN_obj) {
       NVIC_EnableIRQ(CAN2_TX_IRQn);
       NVIC_EnableIRQ(CAN2_RX0_IRQn);
       NVIC_EnableIRQ(CAN2_SCE_IRQn);
-    #ifdef CAN3
-      } else if (CAN_obj == CAN3) {
-        NVIC_EnableIRQ(CAN3_TX_IRQn);
-        NVIC_EnableIRQ(CAN3_RX0_IRQn);
-        NVIC_EnableIRQ(CAN3_SCE_IRQn);
-    #endif
     } else {
       puts("Invalid CAN: initialization failed\n");
     }
